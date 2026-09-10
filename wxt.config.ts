@@ -28,7 +28,10 @@ export default defineConfig({
           minimum_chrome_version: '116',
           incognito: 'split' as const,
         }),
-    action: { default_title: 'ChatGPT Switch' },
-    icons: { 16: 'icons/16.png', 32: 'icons/32.png', 48: 'icons/48.png', 128: 'icons/128.png' },
+    action: {
+      default_title: 'ChatGPT Switch',
+      default_icon: 'icons/128.png',
+    },
+    icons: { 128: 'icons/128.png' },
   }),
 });

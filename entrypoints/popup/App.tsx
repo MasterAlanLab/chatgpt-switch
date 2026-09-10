@@ -279,9 +279,7 @@ export default function App() {
       <div className="app-scroll">
         <header className="app-header">
           <div className="brand">
-            <div className="brand-icon">
-              <ArrowLeftRight size={23} strokeWidth={2.2} />
-            </div>
+            <img className="brand-icon" src="/icons/128.png" alt="" />
             <div>
               <h1>
                 ChatGPT <span>Switch</span>
