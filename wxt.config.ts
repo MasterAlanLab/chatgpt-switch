@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     name: 'ChatGPT Switch',
     description:
-      '在本机保存与切换 ChatGPT 登录态，支持 Session Token 和 Cookie JSON。无支付或订阅功能。',
+      '在本机保存、管理并快速切换多个 ChatGPT 登录状态，支持 Session Token、Cookie JSON 导入和无痕窗口隔离。',
     permissions: ['storage', 'cookies', 'activeTab', 'browsingData'],
     host_permissions: [
       'https://chatgpt.com/*',

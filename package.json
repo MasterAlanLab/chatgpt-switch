@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-switch",
-  "description": "A local-first ChatGPT session switcher, built with WXT.",
+  "description": "在本机保存、管理和快速切换多个 ChatGPT 登录状态的浏览器扩展。",
   "version": "1.0.5",
   "private": true,
   "type": "module",

@@ -1,6 +1,10 @@
 # ChatGPT Switch
 
-基于 **WXT 0.21.4 + React 19 + TypeScript** 的 Manifest V3 浏览器扩展。在本机保存、管理和切换 ChatGPT 登录态。使用中文界面，适配 Chrome / Edge 等 Chromium 浏览器（Chrome 116+）。
+**ChatGPT Switch** 是一款用于管理多个 ChatGPT 登录状态的浏览器扩展。你可以将当前浏览器中的 ChatGPT 登录状态保存到本机，并在多个账号之间快速切换，无需反复退出登录或重新输入账号信息。
+
+项目基于 **WXT 0.21.4 + React 19 + TypeScript**，使用中文界面，支持 Chrome、Edge 和 Firefox。
+
+[隐私政策](./PRIVACY.md)
 
 WXT 版本于 2026-09-09 通过包注册表的 `latest` 标签和 [WXT 官方文档](https://wxt.dev/guide/installation.html) 核实，已精确锁定在 `package.json` 与 `bun.lock`。
 
