@@ -1,7 +1,7 @@
 {
   "name": "chatgpt-switch",
   "description": "A local-first ChatGPT session switcher, built with WXT.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.14",

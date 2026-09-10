@@ -33,7 +33,7 @@ Chrome / Edge 扩展管理页开启「开发者模式」，点击「加载已解
 
 多浏览器构建会在 `.output/` 下生成带当前版本号的 `chrome.zip`、`edge.zip`、`firefox.zip`，以及 Firefox 商店提交所需的 `sources.zip`。安装时先解压，再加载其中的扩展目录。修改代码后重新构建，并在浏览器扩展管理页重新加载。
 
-推送与 `package.json` 版本一致的 `v*` tag（例如 `v1.0.4`）后，GitHub Actions 会运行类型检查与单元测试、构建以上压缩包，并自动创建 GitHub Release。若发布任务重跑，会覆盖同名 Release 附件。
+推送与 `package.json` 版本一致的 `v*` tag（例如 `v1.0.5`）后，GitHub Actions 会运行类型检查与单元测试、构建以上压缩包，并自动创建 GitHub Release。若发布任务重跑，会覆盖同名 Release 附件。
 
 端到端测试使用全新的临时 Chromium 配置文件，并拦截网站请求为本地测试页面，不读取或修改日常浏览器的账号：
 
