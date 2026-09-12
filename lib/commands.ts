@@ -37,6 +37,9 @@ export function validateCommand(value: unknown): Command {
         return fail();
       break;
     }
+    case 'usage':
+      if (typeof data.details !== 'boolean') return fail();
+      break;
     case 'logout':
     case 'open':
       break;

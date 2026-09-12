@@ -21,7 +21,7 @@ const secondToken = 'synthetic-work-session-'.repeat(8);
 
 test.beforeAll(async () => {
   profile = await mkdtemp(join(tmpdir(), 'chatgpt-switch-test-'));
-  const extension = resolve('.output/chrome-mv3');
+  const extension = resolve('dist/chrome-mv3');
   await access(join(extension, 'manifest.json'));
   context = await chromium.launchPersistentContext(profile, {
     channel: 'chromium',

@@ -55,10 +55,10 @@ jobs:
         shell: bash
         run: |
           for asset in \
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-chrome.zip" \
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-edge.zip" \
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-firefox.zip" \
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-sources.zip"; do
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-chrome.zip" \
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-edge.zip" \
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-firefox.zip" \
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-sources.zip"; do
             test -f "$asset" || { echo "Missing release asset: $asset"; exit 1; }
           done
 
@@ -68,10 +68,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           assets=(
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-chrome.zip"
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-edge.zip"
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-firefox.zip"
-            ".output/chatgpt-switch-${PACKAGE_VERSION}-sources.zip"
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-chrome.zip"
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-edge.zip"
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-firefox.zip"
+            "dist/chatgpt-switch-${PACKAGE_VERSION}-sources.zip"
           )
 
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then

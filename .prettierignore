@@ -1,6 +1,7 @@
 node_modules
 .wxt
 .output
+dist
 chatgpt-onekey-login-unpacked
 artifacts
 package-lock.json

@@ -3,6 +3,8 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   targetBrowsers: ['chrome', 'edge', 'firefox'],
+  // Not `.output`: macOS file pickers hide dot-directories, so "load unpacked" cannot reach it.
+  outDir: 'dist',
   manifest: ({ browser }) => ({
     name: 'ChatGPT Switch',
     description:

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { SwitchService } from '../lib/service';
+import type { Fetch } from '../lib/usage-client';
 import { cookie, mockBrowser } from './mock-browser';
 
 const token = 'synthetic-session-'.repeat(8);
+const profileFetch = (async () => ({
+  ok: true,
+  json: async () => ({
+    accessToken: 'synthetic-access-token',
+    expires: new Date(Date.now() + 3600000).toISOString(),
+    user: { name: '真实账号名', email: 'user@example.com' },
+  }),
+})) as unknown as Fetch;
 
 describe('Account service', () => {
   it('saves, deduplicates, renames, and deletes without exposing credentials', async () => {
@@ -56,12 +65,13 @@ describe('Account service', () => {
   });
   it('captures a session only after a capture command', async () => {
     const mock = mockBrowser([cookie(token)]);
-    const service = new SwitchService(mock.browser);
+    const service = new SwitchService(mock.browser, profileFetch);
     await service.dispatch({ type: 'state' });
     expect(mock.api.storage.local.set).not.toHaveBeenCalled();
-    const result = await service.dispatch({ type: 'capture', name: '当前', tabId: 1 });
+    const result = await service.dispatch({ type: 'capture', name: '', tabId: 1 });
     expect(result.ok && result.state.activeAccountId).toBeTruthy();
-    expect(result.ok && result.state.accounts[0]?.name).toBe('当前');
+    expect(result.ok && result.state.accounts[0]?.name).toBe('真实账号名');
+    expect(result.ok && result.state.accounts[0]?.email).toBe('user@example.com');
   });
   it('keeps private accounts out of persistent storage and skips browsingData cleanup', async () => {
     const mock = mockBrowser([cookie(token, undefined, '1')]);

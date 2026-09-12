@@ -3,6 +3,7 @@ node_modules/
 
 # WXT build/cache output
 .output/
+dist/
 .wxt/
 
 # Tests and generated artifacts

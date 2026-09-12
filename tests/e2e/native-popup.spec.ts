@@ -122,7 +122,7 @@ class NativePopup {
 
 test('native toolbar popup cold-start, reopen, promotion and account dialogs', async () => {
   const profile = await mkdtemp(join(tmpdir(), 'chatgpt-switch-native-'));
-  const extension = resolve('.output/chrome-mv3');
+  const extension = resolve('dist/chrome-mv3');
   await access(join(extension, 'manifest.json'));
   const context = await chromium.launchPersistentContext(profile, {
     channel: 'chromium',

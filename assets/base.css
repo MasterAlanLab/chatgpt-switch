@@ -548,6 +548,49 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.usage-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+/* A cached reading is still useful, so it fades rather than disappearing. */
+.usage-line.stale {
+  opacity: 0.55;
+}
+.usage-label {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.usage-bar {
+  width: 72px;
+  height: 4px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.usage-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--muted);
+}
+.usage-bar.band-mid i {
+  background: var(--accent-strong);
+}
+.usage-bar.band-high i {
+  background: var(--danger);
+}
+.usage-percent {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.usage-reset {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .current-tag {
   font-size: 8px;
   color: var(--accent);

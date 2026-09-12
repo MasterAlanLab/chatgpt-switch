@@ -5,6 +5,35 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = { clearSiteData: false, openAfterSwitch: true };
 
+export interface UsageWindow {
+  usedPercent: number;
+  windowMinutes?: number;
+  resetsAt?: number;
+}
+
+export interface ResetCredit {
+  id: string;
+  expiresAt?: number;
+}
+
+export interface UsageSnapshot {
+  session?: UsageWindow;
+  weekly?: UsageWindow;
+  resetCredits?: number;
+  // Only present after a manual refresh; the automatic path skips the extra request.
+  resetCreditDetails?: ResetCredit[];
+  fetchedAt: number;
+}
+
+// A ChatGPT access token, readable only while the account's cookie is installed.
+export interface AccountAuth {
+  accessToken: string;
+  accountId?: string;
+  name?: string;
+  email?: string;
+  expiresAt: number;
+}
+
 export interface SavedAccount {
   id: string;
   name: string;
@@ -14,9 +43,13 @@ export interface SavedAccount {
   updatedAt: number;
   lastUsedAt?: number;
   expiresAt?: number;
+  auth?: AccountAuth;
+  usage?: UsageSnapshot;
 }
 
-export type AccountSummary = Omit<SavedAccount, 'token'>;
+// `auth` holds a bearer credential, so it never reaches the popup; the popup only
+// needs to know whether a refresh is still possible.
+export type AccountSummary = Omit<SavedAccount, 'token' | 'auth'> & { canRefreshUsage: boolean };
 export interface Vault {
   version: 1;
   accounts: SavedAccount[];
@@ -49,7 +82,8 @@ export type Command =
   | { type: 'delete'; id: string; tabId: number }
   | { type: 'settings'; settings: Settings; tabId: number }
   | { type: 'logout'; tabId: number }
-  | { type: 'open'; tabId: number };
+  | { type: 'open'; tabId: number }
+  | { type: 'usage'; details: boolean; tabId: number };
 
 export type Response =
   { ok: true; state: AppState; message?: string } | { ok: false; error: string };

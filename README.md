@@ -22,6 +22,7 @@
 - 支持 Session Token、Cookie JSON 和 Cookie Header。
 - 自动识别并处理分片 Session Cookie。
 - 支持账号备注编辑、搜索和删除。
+- 显示各账号的 Codex 额度用量、重置时间和重置额度。
 - 可选清理指定 ChatGPT 站点的本地数据。
 - 隔离普通窗口与无痕窗口的账号记录。
 - 切换失败时尝试恢复原有 Cookie。
@@ -52,6 +53,7 @@
 - Session Token、Cookie、账号备注和设置保存在浏览器本地。
 - 普通窗口使用 `storage.local`，无痕窗口使用 `storage.session`。
 - 扩展不包含遥测、用户行为分析、远程脚本或账号数据上传接口。
+- 额度数据直接向 `chatgpt.com` 读取，不经过中间服务器；无痕窗口不读取额度。
 - Session Token 可能以明文形式保存在扩展存储中，请在可信设备上使用。
 - 外部链接仅在用户主动点击时打开，不附加 Session 或账号资料。
 
@@ -83,7 +85,7 @@ bun run build
 bun run release:build
 ```
 
-`bun run release:build` 会在 `.output/` 中生成 Chrome、Edge、Firefox 发布包及 Firefox 源码包。
+`bun run release:build` 会在 `dist/` 中生成 Chrome、Edge、Firefox 发布包及 Firefox 源码包。
 
 ## 测试
 
@@ -99,6 +101,6 @@ bun run test:e2e
 
 ## 资源推荐
 
-| 类别    | 服务                                   | 说明                   |
-| :------ | :------------------------------------- | :--------------------- |
+| 类别    | 服务                                   | 说明                        |
+| :------ | :------------------------------------- | :-------------------------- |
 | AI 服务 | [AI 订阅服务](https://ai.corouter.cc/) | 艾伦的 ChatGPT 代充代付服务 |

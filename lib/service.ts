@@ -6,29 +6,57 @@ import { publicError, UserError } from './errors';
 import { parseSessionInput, validateToken, type SessionInput } from './session';
 import {
   DEFAULT_SETTINGS,
+  type AccountAuth,
   type AppState,
+  type Command,
   type Response,
   type SavedAccount,
   type TabContext,
+  type UsageSnapshot,
   type Vault,
 } from './types';
+import { isAuthUsable } from './usage';
+import { readAuth, readUsage, type Fetch } from './usage-client';
 
 const VAULT_KEY = 'chatgpt-switch:v1';
 const PRIVATE_VAULT_KEY = 'chatgpt-switch:private:v1';
+const DEFAULT_CAPTURE_NAME = '当前 ChatGPT 账号';
+
+type UsageUpdate = { auth?: AccountAuth; usage?: UsageSnapshot };
 
 export class SwitchService {
   private queue: Promise<unknown> = Promise.resolve();
   private sessions: SessionCookies;
 
-  constructor(private api: WxtBrowser) {
+  constructor(
+    private api: WxtBrowser,
+    private fetchImpl: Fetch = (...args) => fetch(...args),
+  ) {
     this.sessions = new SessionCookies(api);
   }
 
   dispatch(input: unknown): Promise<Response> {
-    const result = this.queue.then(async (): Promise<Response> => {
+    let command: Command;
+    try {
+      command = validateCommand(input);
+    } catch (error) {
+      return Promise.resolve({ ok: false, error: publicError(error) });
+    }
+    // A quota refresh waits on the network, so it only enters the queue to write.
+    if (command.type === 'usage') return this.usage(command);
+    return this.serialize(() => this.execute(command));
+  }
+
+  private serialize<T>(task: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(task);
+    this.queue = result.catch(() => {});
+    return result;
+  }
+
+  private execute(command: Command): Promise<Response> {
+    return (async (): Promise<Response> => {
       let context: TabContext | undefined;
       try {
-        const command = validateCommand(input);
         context = await this.context(command.type === 'state' ? undefined : command.tabId);
         const vault = await this.readVault(context);
         let message: string | undefined;
@@ -50,11 +78,18 @@ export class SwitchService {
             const session = await this.sessions.current(context.storeId);
             if (!session.token)
               throw new UserError('当前浏览器环境没有 ChatGPT 登录 Cookie，请先登录。');
-            this.upsert(
+            const auth = await readAuth(this.fetchImpl);
+            const account = this.upsert(
               vault,
-              { ...session, token: session.token, name: '当前 ChatGPT 账号' },
+              {
+                ...session,
+                token: session.token,
+                name: auth?.name ?? auth?.email ?? DEFAULT_CAPTURE_NAME,
+                email: auth?.email,
+              },
               command.name,
             );
+            if (auth) account.auth = auth;
             await this.writeVault(context, vault);
             message = '当前登录态已保存，可编辑备注名称';
             break;
@@ -149,9 +184,81 @@ export class SwitchService {
         const message = publicError(error);
         return { ok: false, error: message };
       }
-    });
-    this.queue = result.catch(() => {});
-    return result;
+    })();
+  }
+
+  private async usage(command: Extract<Command, { type: 'usage' }>): Promise<Response> {
+    try {
+      const context = await this.context(command.tabId);
+      // Firefox shares one background cookie jar across windows, so reading the
+      // session of a private-window account could pick up the wrong login.
+      const updates = context.incognito
+        ? new Map<string, UsageUpdate>()
+        : await this.collectUsage(context, command.details);
+      return await this.serialize(async (): Promise<Response> => {
+        // Re-read: the list may have changed while the refresh was in flight.
+        const vault = await this.readVault(context);
+        let changed = false;
+        for (const account of vault.accounts) {
+          const update = updates.get(account.id);
+          if (!update) continue;
+          if (update.auth) {
+            account.auth = update.auth;
+            account.email = update.auth.email ?? account.email;
+            if (account.name === DEFAULT_CAPTURE_NAME) {
+              account.name = update.auth.name ?? update.auth.email ?? account.name;
+            }
+          }
+          if (update.usage) account.usage = update.usage;
+          changed ||= !!(update.auth ?? update.usage);
+        }
+        if (changed) await this.writeVault(context, vault);
+        const message =
+          command.details && !changed ? '没有可读取额度的账号，请先切换到目标账号。' : undefined;
+        return { ok: true, state: await this.state(context, vault), message };
+      });
+    } catch (error) {
+      return { ok: false, error: publicError(error) };
+    }
+  }
+
+  private async collectUsage(
+    context: TabContext,
+    details: boolean,
+  ): Promise<Map<string, UsageUpdate>> {
+    const vault = await this.readVault(context);
+    const updates = new Map<string, UsageUpdate>();
+    // Only the account whose cookie is installed can mint a fresh bearer token.
+    const active = await this.activeAccount(context, vault);
+    if (active) {
+      const needsProfile = active.name === DEFAULT_CAPTURE_NAME && !active.auth?.name;
+      const auth =
+        isAuthUsable(active.auth) && !needsProfile ? active.auth : await readAuth(this.fetchImpl);
+      if (auth) updates.set(active.id, { auth });
+    }
+    await Promise.all(
+      vault.accounts.map(async (account) => {
+        const auth = updates.get(account.id)?.auth ?? account.auth;
+        if (!isAuthUsable(auth)) return;
+        const usage = await readUsage(this.fetchImpl, auth, details);
+        if (usage) updates.set(account.id, { ...updates.get(account.id), usage });
+      }),
+    );
+    return updates;
+  }
+
+  private async activeAccount(
+    context: TabContext,
+    vault: Vault,
+  ): Promise<SavedAccount | undefined> {
+    try {
+      const { token } = await this.sessions.current(context.storeId);
+      return token ? vault.accounts.find((account) => account.token === token) : undefined;
+    } catch (error) {
+      // A damaged cookie set is repairable from the UI; it must not fail a refresh.
+      if (error instanceof UserError) return undefined;
+      throw error;
+    }
   }
 
   private async context(tabId?: number): Promise<TabContext> {
@@ -218,6 +325,17 @@ export class SwitchService {
         throw new UserError('本地账号记录格式异常，原始记录已保留。');
       }
       validateToken(account.token);
+      // Quota data is decoration: drop anything malformed instead of locking the vault.
+      if (
+        account.auth &&
+        (typeof account.auth.accessToken !== 'string' ||
+          !Number.isFinite(account.auth.expiresAt) ||
+          (account.auth.name !== undefined && typeof account.auth.name !== 'string') ||
+          (account.auth.email !== undefined && typeof account.auth.email !== 'string'))
+      ) {
+        account.auth = undefined;
+      }
+      if (account.usage && !Number.isFinite(account.usage.fetchedAt)) account.usage = undefined;
       ids.add(account.id);
     }
     return vault;
@@ -263,7 +381,10 @@ export class SwitchService {
     return {
       context,
       settings: vault.settings,
-      accounts: vault.accounts.map(({ token: _token, ...summary }) => summary),
+      accounts: vault.accounts.map(({ token: _token, auth, ...summary }) => ({
+        ...summary,
+        canRefreshUsage: isAuthUsable(auth),
+      })),
       hasSession: !!token,
       activeAccountId: token
         ? vault.accounts.find((account) => account.token === token)?.id

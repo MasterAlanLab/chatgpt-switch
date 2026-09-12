@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  CircleGauge,
   CircleHelp,
   ExternalLink,
   Eye,
@@ -34,6 +35,7 @@ import {
 import { browser } from 'wxt/browser';
 import { parseSessionInput, splitSessionToken } from '../../lib/session';
 import type { AccountSummary, AppState, Command, Response, Settings } from '../../lib/types';
+import { bindingWindow, isStale, resetLabel, usageBand, usageTooltip } from '../../lib/usage';
 import AccountMenu from './AccountMenu';
 import Promotion from './Promotion';
 
@@ -46,6 +48,49 @@ const dateLabel = (time?: number) =>
   time
     ? new Date(time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
     : '尚未切换';
+
+/**
+ * One line carrying either identity or quota. The 5h and weekly windows compete for
+ * the same row, so only the one closest to its cap is drawn; the rest sits in the
+ * native tooltip.
+ */
+function AccountSubtitle({ account, expired }: { account: AccountSummary; expired: boolean }) {
+  if (expired) return <>记录已过期，请添加新 Session</>;
+  const binding = bindingWindow(account.usage);
+  if (account.usage && binding) {
+    const percent = Math.round(binding.window.usedPercent);
+    const reset = resetLabel(binding.window.resetsAt);
+    return (
+      <span
+        className={`usage-line ${isStale(account.usage) ? 'stale' : ''}`}
+        role="img"
+        aria-label={`${binding.label} 额度已用 ${percent}%${reset ? `，${reset}` : ''}`}
+      >
+        <span className="usage-label">{binding.label}</span>
+        <span className={`usage-bar band-${usageBand(binding.window.usedPercent)}`}>
+          <i style={{ width: `${percent}%` }} />
+        </span>
+        <span className="usage-percent">{percent}%</span>
+        {reset && <span className="usage-reset">· {reset}</span>}
+      </span>
+    );
+  }
+  const identity =
+    account.email ??
+    (account.lastUsedAt
+      ? `上次切换 ${dateLabel(account.lastUsedAt)}`
+      : `添加于 ${dateLabel(account.createdAt)}`);
+  const status = account.usage
+    ? '未使用过 Codex'
+    : account.canRefreshUsage
+      ? '额度未知'
+      : '需切到此账号后刷新';
+  return (
+    <>
+      {identity} · {status}
+    </>
+  );
+}
 
 function ModalShell({
   title,
@@ -219,11 +264,16 @@ export default function App() {
   const closeMenu = useCallback(() => setMenu(undefined), []);
   const [modal, setModal] = useState<Modal>(null);
   const [rename, setRename] = useState('');
+  const [usageBusy, setUsageBusy] = useState(false);
   const inFlight = useRef(false);
+  // Bumped by every account operation so a slow quota refresh cannot overwrite newer state.
+  const generation = useRef(0);
+  const autoRefreshed = useRef(false);
 
   const run = useCallback(async (command: Command): Promise<boolean> => {
     if (inFlight.current) return false;
     inFlight.current = true;
+    generation.current += 1;
     setBusy(true);
     setNotice(undefined);
     try {
@@ -245,6 +295,29 @@ export default function App() {
     }
   }, []);
 
+  /**
+   * Quota refresh runs outside `run`: it can take seconds across several accounts and
+   * must never disable the switch buttons while it waits.
+   */
+  const refreshUsage = useCallback(async (details: boolean, tabId: number) => {
+    const mark = generation.current;
+    setUsageBusy(true);
+    try {
+      const response = (await browser.runtime.sendMessage({
+        type: 'usage',
+        details,
+        tabId,
+      })) as Response | undefined;
+      if (!response?.ok || generation.current !== mark) return;
+      setState(response.state);
+      if (details && response.message) setNotice({ text: response.message, error: false });
+    } catch {
+      // Quota is decoration; a failed refresh leaves the list exactly as it was.
+    } finally {
+      setUsageBusy(false);
+    }
+  }, []);
+
   const updateSettings = async (settings: Settings) => {
     if (!state || inFlight.current) return;
     const previous = state;
@@ -256,6 +329,17 @@ export default function App() {
   useEffect(() => {
     void run({ type: 'state' });
   }, [run]);
+  useEffect(() => {
+    if (!state || autoRefreshed.current) return;
+    // Only worth a request when something is actually stale and readable.
+    const needed = state.accounts.some(
+      (account) =>
+        isStale(account.usage) && (account.canRefreshUsage || account.id === state.activeAccountId),
+    );
+    if (!needed) return;
+    autoRefreshed.current = true;
+    void refreshUsage(false, state.context.tabId);
+  }, [state, refreshUsage]);
   useEffect(() => closeMenu(), [tab, query, closeMenu]);
 
   const context = state?.context;
@@ -436,11 +520,11 @@ export default function App() {
                   </h2>
                   <button
                     className="icon-button small"
-                    aria-label="刷新账号状态"
-                    disabled={busy}
-                    onClick={() => void run({ type: 'state' })}
+                    aria-label="刷新账号状态与额度"
+                    disabled={busy || usageBusy}
+                    onClick={() => void refreshUsage(true, state.context.tabId)}
                   >
-                    <RefreshCw size={14} className={busy ? 'spin' : ''} />
+                    <RefreshCw size={14} className={busy || usageBusy ? 'spin' : ''} />
                   </button>
                 </div>
                 {state.accounts.length > 0 && (
@@ -504,16 +588,19 @@ export default function App() {
                           </div>
                           <div className="account-info">
                             <div className="account-name">
-                              <h3 title={account.name}>{account.name}</h3>
+                              <h3
+                                title={
+                                  account.email
+                                    ? `${account.name} · ${account.email}`
+                                    : account.name
+                                }
+                              >
+                                {account.name}
+                              </h3>
                               {current && <span className="current-tag">当前</span>}
                             </div>
-                            <p title={account.email}>
-                              {account.email ??
-                                (expired
-                                  ? '记录已过期，请添加新 Session'
-                                  : account.lastUsedAt
-                                    ? `上次切换 ${dateLabel(account.lastUsedAt)}`
-                                    : `添加于 ${dateLabel(account.createdAt)}`)}
+                            <p title={account.usage ? usageTooltip(account.usage) : account.email}>
+                              <AccountSubtitle account={account} expired={expired} />
                             </p>
                           </div>
                           <button
@@ -579,6 +666,10 @@ export default function App() {
                 <p className="small-note">
                   <Fingerprint size={12} />
                   同一浏览器环境共享登录态，切换会影响其他 ChatGPT 标签页。
+                </p>
+                <p className="small-note">
+                  <CircleGauge size={12} />
+                  额度来自 Codex 用量接口，不代表网页聊天的消息额度。
                 </p>
               </>
             ) : (

@@ -25,11 +25,22 @@ export class SessionCookies {
     const cookies = (await this.api.cookies.getAll({ url: CHATGPT_URL, storeId })).filter(
       (cookie) => isSessionCookie(cookie.name) && !cookie.partitionKey,
     );
-    const expires = cookies.flatMap((cookie) =>
+    // ChatGPT has migrated its session cookies between `.chatgpt.com` and the
+    // host-only `chatgpt.com` scope. Both sets can remain in Chrome at once even
+    // though the host-only set is the one selected for the current site. Keep the
+    // scopes separate so stale domain cookies cannot make a valid login look
+    // ambiguous.
+    const hostOnly = cookies.filter(
+      (cookie) => cookie.hostOnly && cookie.domain.replace(/^\./, '') === 'chatgpt.com',
+    );
+    const selected = hostOnly.length
+      ? hostOnly
+      : cookies.filter((cookie) => cookie.domain.replace(/^\./, '') === 'chatgpt.com');
+    const expires = selected.flatMap((cookie) =>
       cookie.expirationDate ? [cookie.expirationDate * 1000] : [],
     );
     return {
-      token: joinSessionCookies(cookies),
+      token: joinSessionCookies(selected),
       expiresAt: expires.length ? Math.min(...expires) : undefined,
     };
   }

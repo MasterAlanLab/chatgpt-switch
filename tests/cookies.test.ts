@@ -7,6 +7,20 @@ const oldToken = 'old-synthetic-session-'.repeat(5);
 const token = 'new-synthetic-session-'.repeat(5);
 
 describe('Cookie replacement', () => {
+  it('prefers the active host-only session when a stale domain-scoped session remains', async () => {
+    const current = 'current-host-session-'.repeat(6);
+    const stale = 'stale-domain-session-'.repeat(6);
+    const mock = mockBrowser([
+      { ...cookie(current, SESSION_COOKIE + '.0'), domain: 'chatgpt.com', hostOnly: true },
+      { ...cookie(current, SESSION_COOKIE + '.1'), domain: 'chatgpt.com', hostOnly: true },
+      { ...cookie(stale, SESSION_COOKIE + '.0'), domain: '.chatgpt.com', hostOnly: false },
+      { ...cookie(stale, SESSION_COOKIE + '.1'), domain: '.chatgpt.com', hostOnly: false },
+    ]);
+
+    const session = await new SessionCookies(mock.browser).current('0');
+
+    expect(session.token).toBe(current + current);
+  });
   it('awaits removal of all old chunks, including high suffixes, before writing', async () => {
     const mock = mockBrowser([
       cookie(oldToken, SESSION_COOKIE + '.0'),
