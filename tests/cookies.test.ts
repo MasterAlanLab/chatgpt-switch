@@ -21,6 +21,18 @@ describe('Cookie replacement', () => {
 
     expect(session.token).toBe(current + current);
   });
+  it('reads one cookie scope when another account remains in the same URL scope', async () => {
+    const current = 'current-scope-session-'.repeat(6);
+    const stale = 'stale-scope-session-'.repeat(6);
+    const mock = mockBrowser([
+      { ...cookie(current), hostOnly: false },
+      { ...cookie(stale), domain: '.chatgpt.com', hostOnly: false },
+    ]);
+
+    const session = await new SessionCookies(mock.browser).current('0');
+
+    expect(session.token).toBe(current);
+  });
   it('awaits removal of all old chunks, including high suffixes, before writing', async () => {
     const mock = mockBrowser([
       cookie(oldToken, SESSION_COOKIE + '.0'),

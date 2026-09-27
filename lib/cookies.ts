@@ -5,6 +5,19 @@ import { isSessionCookie, joinSessionCookies, splitSessionToken } from './sessio
 
 type Cookie = Browser.cookies.Cookie;
 
+function scopeKey(cookie: Cookie): string {
+  // Cookies with the same name can coexist when their domain or path differs.
+  // Keep only one scope when reading the session that the current ChatGPT URL
+  // would use; passing every scope to joinSessionCookies makes an old account
+  // look like a conflicting login.
+  return [
+    cookie.domain,
+    cookie.path,
+    cookie.hostOnly ? 'host-only' : 'domain',
+    JSON.stringify(cookie.partitionKey ?? null),
+  ].join('\u0000');
+}
+
 export class SessionCookies {
   constructor(private api: Pick<WxtBrowser, 'cookies'>) {}
 
@@ -30,12 +43,19 @@ export class SessionCookies {
     // though the host-only set is the one selected for the current site. Keep the
     // scopes separate so stale domain cookies cannot make a valid login look
     // ambiguous.
-    const hostOnly = cookies.filter(
+    const chatgptCookies = cookies.filter(
+      (cookie) => cookie.domain.replace(/^\./, '') === 'chatgpt.com',
+    );
+    const hostOnly = chatgptCookies.filter(
       (cookie) => cookie.hostOnly && cookie.domain.replace(/^\./, '') === 'chatgpt.com',
     );
-    const selected = hostOnly.length
-      ? hostOnly
-      : cookies.filter((cookie) => cookie.domain.replace(/^\./, '') === 'chatgpt.com');
+    const candidates = hostOnly.length ? hostOnly : chatgptCookies;
+    const first = candidates[0];
+    const scoped = first ? candidates.filter((cookie) => scopeKey(cookie) === scopeKey(first)) : [];
+    // A broken browser profile can expose the same cookie name more than once.
+    // Keep the first value in the browser's order instead of letting a stale
+    // duplicate block capture of the active session.
+    const selected = [...new Map(scoped.map((cookie) => [cookie.name, cookie])).values()];
     const expires = selected.flatMap((cookie) =>
       cookie.expirationDate ? [cookie.expirationDate * 1000] : [],
     );
